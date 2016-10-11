@@ -1,0 +1,34 @@
+#!/usr/bin/env python2
+
+import Milter
+
+authservid = "example.com;" # replace with your authservid!
+
+class reject_unauth_milter(Milter.Base):
+    def __init__(self):
+        self.dmarc = False
+        self.spf_fail = False
+        self.dkim = False
+
+    @Milter.noreply
+    def header(self, field, value):
+        if field == "Authentication-Results" and value.startswith(authservid):
+            if "dmarc=pass" in value:
+                self.dmarc = True
+            if "dkim=pass" in value:
+                self.dkim = True
+            if "spf=fail" in value:
+                self.spf_fail = True
+        return Milter.CONTINUE
+
+    def eoh(self):
+        if self.dmarc:
+            return Milter.CONTINUE
+        if self.dkim:
+            return Milter.CONTINUE
+        if self.spf_fail:
+            return Milter.REJECT
+        return Milter.CONTINUE
+
+Milter.factory = reject_unauth_milter
+Milter.runmilter("reject-unauth", "/var/spool/postfix/private/reject-unauth", 5)
