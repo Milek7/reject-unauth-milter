@@ -3,8 +3,7 @@
 import Milter
 import authres
 import re
-
-authservid = "example.com;"
+import sys
 
 fromregex = re.compile("@(\S+)>")
 class reject_unauth_milter(Milter.Base):
@@ -16,16 +15,15 @@ class reject_unauth_milter(Milter.Base):
     @Milter.noreply
     def header(self, field, value):
         try:
-            if field == "Authentication-Results" and value.startswith(authservid):
+            if field == "Authentication-Results" and value.startswith(self.getsymval("j") + ";"):
                 ar = authres.AuthenticationResultsHeader.parse("Authentication-Results: " + value)
-                for result in ar:
-                    if result.method == "spf":
-                        if result.result == "fail":
-                            self.spf_fail = True
+                for result in ar.results:
+                    if result.method == "spf" and result.result == "fail":
+                        self.spf_fail = True
                     elif result.method == "dkim" and result.result == "pass":
-                            for property in result.properties:
-                                if property.type == "header" and property.name == "d":
-                                    self.dkim_domain.append(property.value)
+                        for property in result.properties:
+                            if property.type == "header" and property.name == "d":
+                                self.dkim_domain.append(property.value)
             elif field == "From":
                 self.from_domain = fromregex.search(value).group(1)
         except:
@@ -36,8 +34,9 @@ class reject_unauth_milter(Milter.Base):
         if self.from_domain in self.dkim_domain:
             return Milter.CONTINUE
         if self.spf_fail:
+            self.setreply("550", "5.7.1", "Message unauthorized: SPF failure, no DKIM")
             return Milter.REJECT
         return Milter.CONTINUE
 
 Milter.factory = reject_unauth_milter
-Milter.runmilter("reject-unauth", "/var/spool/postfix/private/reject-unauth", 1)
+Milter.runmilter("reject-unauth", sys.argv[1], 1)
