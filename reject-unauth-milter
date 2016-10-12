@@ -15,18 +15,21 @@ class reject_unauth_milter(Milter.Base):
 
     @Milter.noreply
     def header(self, field, value):
-        if field == "Authentication-Results" and value.startswith(authservid):
-            ar = authres.AuthenticationResultsHeader.parse("Authentication-Results: " + value)
-            for result in ar:
-                if result.method == "spf":
-                    if result.result == "fail":
-                        self.spf_fail = True
-                elif result.method == "dkim" and result.result == "pass":
-                        for property in result.properties:
-                            if property.type == "header" and property.name == "d":
-                                self.dkim_domain.append(property.value)
-        elif field == "From":
-            self.from_domain = fromregex.search(value).group(1)
+        try:
+            if field == "Authentication-Results" and value.startswith(authservid):
+                ar = authres.AuthenticationResultsHeader.parse("Authentication-Results: " + value)
+                for result in ar:
+                    if result.method == "spf":
+                        if result.result == "fail":
+                            self.spf_fail = True
+                    elif result.method == "dkim" and result.result == "pass":
+                            for property in result.properties:
+                                if property.type == "header" and property.name == "d":
+                                    self.dkim_domain.append(property.value)
+            elif field == "From":
+                self.from_domain = fromregex.search(value).group(1)
+        except:
+            pass
         return Milter.CONTINUE
 
     def eoh(self):
