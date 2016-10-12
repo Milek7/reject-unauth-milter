@@ -21,7 +21,7 @@ class reject_unauth_milter(Milter.Base):
                 if result.method == "spf"
                     if result.result == "fail":
                         self.spf_fail = True
-                elif result.method == "dkim":
+                elif result.method == "dkim" and result.result == "pass":
                         for property in result.properties:
                             if property.type == "header" and property.name == "d":
                                 self.dkim_domain.append(property.value)
