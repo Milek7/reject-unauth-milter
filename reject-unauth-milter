@@ -1,34 +1,40 @@
 #!/usr/bin/env python2
 
 import Milter
+import authres
+import re
 
-authservid = "example.com;" # replace with your authservid!
+authservid = "example.com;"
 
+fromregex = re.compile("@(\S+)>")
 class reject_unauth_milter(Milter.Base):
     def __init__(self):
-        self.dmarc = False
         self.spf_fail = False
-        self.dkim = False
+        self.dkim_domain = []
+        self.from = False
 
     @Milter.noreply
     def header(self, field, value):
         if field == "Authentication-Results" and value.startswith(authservid):
-            if "dmarc=pass" in value:
-                self.dmarc = True
-            if "dkim=pass" in value:
-                self.dkim = True
-            if "spf=fail" in value:
-                self.spf_fail = True
+            ar = authres.AuthenticationResultsHeader.parse("Authentication-Results: " + value)
+            for result in ar:
+                if result.method == "spf"
+                    if result.result == "fail":
+                        self.spf_fail = True
+                elif result.method == "dkim":
+                        foreach property in result.properties:
+                            if property.type == "header" and property.name == "d":
+                                self.dkim_domain.append(property.value)
+        elif field == "From":
+            self.from = fromregex.search(value).group(1)
         return Milter.CONTINUE
 
     def eoh(self):
-        if self.dmarc:
-            return Milter.CONTINUE
-        if self.dkim:
+        if self.from in self.dkim_domain:
             return Milter.CONTINUE
         if self.spf_fail:
             return Milter.REJECT
         return Milter.CONTINUE
 
 Milter.factory = reject_unauth_milter
-Milter.runmilter("reject-unauth", "/var/spool/postfix/private/reject-unauth", 5)
+Milter.runmilter("reject-unauth", "/var/spool/postfix/private/reject-unauth", 1)
